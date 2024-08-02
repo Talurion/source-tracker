@@ -1,33 +1,16 @@
-function getReferrerObject() {
-    const referrerUrl = document.referrer;
-
-    if (!referrerUrl) {
+function getUrlObject(url) {
+    if (!url) { // проверяем есть ли вообще данные о URL адресе или нет
         return;
     }
 
-    const {hostname} = new URL(referrerUrl);
-    const domain = hostname.replace(/^www\./, '');
-    const domainParts = domain.split('.');
-    
-    const mainDomain = domainParts.slice(-2).join('.');
-    const subdomain = domainParts.length > 2 ? domainParts.slice(0, -2).join('.') : '';
-
-    return {url: referrerUrl, domain, mainDomain, subdomain};
-}
-
-getReferrerObject();
-
-function getCurrentPageObject() {
-    const url = document.URL;
-
     const { hostname, protocol, hash, search } = new URL(url);
-    const domain = hostname.replace(/^www\./, '');
-    const domainParts = domain.split('.');
-
+    const domain = hostname.replace(/^www\./, ''); // назначаем доменное имя и удаляем .www
+    
+    const domainParts = domain.split('.'); // дробим домен на части, что бы найти поддомен
     const mainDomain = domainParts.slice(-2).join('.');
     const subdomain = domainParts.length > 2 ? domainParts.slice(0, -2).join('.') : '';
 
-    const params = new URLSearchParams(search);
+    const params = new URLSearchParams(search); // выдергиваем параметры UTM и декодируем их
     const utmSource = decodeURIComponent(params.get('utm_source')) || '';
     const utmMedium = decodeURIComponent(params.get('utm_medium')) || '';
     const utmCampaign = decodeURIComponent(params.get('utm_campaign')) || '';
@@ -35,7 +18,7 @@ function getCurrentPageObject() {
     const utmTerm = decodeURIComponent(params.get('utm_term')) || '';
     const utmContent = decodeURIComponent(params.get('utm_content')) || '';
 
-    return {
+    return { // возвращаем объект со всеми собранными значениями
         url,
         domain,
         mainDomain,
@@ -51,4 +34,5 @@ function getCurrentPageObject() {
     };
 }
 
-getCurrentPageObject();
+console.log(getUrlObject(document.referrer));
+console.log(getUrlObject(document.URL));
