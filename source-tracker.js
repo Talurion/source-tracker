@@ -115,8 +115,6 @@ function getLastSignificantSource () {
         return;
     }
 
-    const cookieData = getCookie(stLastSignificantCookieName)
-
     if (hasUTMParameters()) {
         return stData.currentUrlData.utmSource + '||'
         + stData.currentUrlData.utmMedium + '||'
@@ -135,6 +133,8 @@ function getLastSignificantSource () {
         return stData.referrerData.domain
         + '||referral||(none)||(none)||(none)||(none)';
     }
+
+    const cookieData = getCookie(stLastSignificantCookieName);
 
     if (cookieData) {
         return cookieData;
