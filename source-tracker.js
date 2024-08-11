@@ -1,7 +1,13 @@
-const ST_MERGE_SUBDOMAINS_AND_DOMAIN = true;
+const stMerge = true;
+const stCookieLifetime = 365; // срок жизни куки в днях
+const stSessionLifetime = 60; // срок жизни куки сессии в минутах
+
+const stRandomIdMin = 1000000000;
+const stRandomIdMax = 9999999999;
+
 let stData = '';
 const stLastClickCookieName = 'stLastClick';
-const stLastSignificantCookieName = 'stLastSignificant';
+const stLastNonDirectClickCookieName = 'stLastNonDirect';
 
 const stOrganicSources = {
     'ya.ru': 'yandex',
@@ -54,9 +60,23 @@ function getUrlObject(url) {
     };
 }
 
+
 function isNotEmpty(value) {
     return value !== null && value !== undefined && value !== '';
 }
+
+function getUTime() {
+    return Math.round(new Date().getTime()/1000.0);
+}
+
+function getRandomNumber(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getSessionId() {
+    return getUTime() + '.' + getRandomNumber(stRandomIdMin, stRandomIdMax);
+}
+
 
 function isInternalTransition(merge) {
     if (!stData.referrerData) {
@@ -87,11 +107,11 @@ function selectOrganicSource(domain) {
     return false;
 }
 
-function setCookie(name, value, days) {
+function setCookie(name, value, minutes) {
     let expires = "";
-    if (days) {
+    if (minutes) {
         const date = new Date();
-        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        date.setTime(date.getTime() + (minutes * 60 * 1000));
         expires = "; expires=" + date.toUTCString();
     }
     document.cookie = name + "=" + (value || "") + expires + "; path=/";
@@ -111,7 +131,7 @@ function getLastSignificantSource () {
         currentUrlData: getUrlObject(document.URL),
     }
 
-    if (isInternalTransition(ST_MERGE_SUBDOMAINS_AND_DOMAIN)) {
+    if (isInternalTransition(stMerge)) {
         return;
     }
 
@@ -134,7 +154,7 @@ function getLastSignificantSource () {
         + '||referral||(none)||(none)||(none)||(none)';
     }
 
-    const cookieData = getCookie(stLastSignificantCookieName);
+    const cookieData = getCookie(stLastNonDirectClickCookieName);
 
     if (cookieData) {
         return cookieData;
@@ -142,4 +162,9 @@ function getLastSignificantSource () {
     return '(direct)||(none)||(none)||(none)||(none)||(none)';
 }
 
-console.log(getLastSignificantSource());
+function setLastSignificantSourceCookie () {
+    setCookie('stSessionId', getSessionId(), stSessionLifetime);
+    setCookie(stLastNonDirectClickCookieName, getLastSignificantSource(), (stCookieLifetime * 24 * 60));
+}
+
+setLastSignificantSourceCookie();
