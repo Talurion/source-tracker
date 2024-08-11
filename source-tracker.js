@@ -1,24 +1,42 @@
-const MERGE_SUBDOMAINS_AND_DOMAIN = false;
+const ST_MERGE_SUBDOMAINS_AND_DOMAIN = true;
+let stData = '';
+const stLastClickCookieName = 'stLastClick';
+const stLastSignificantCookieName = 'stLastSignificant';
+
+const stOrganicSources = {
+    'ya.ru': 'yandex',
+    'yandex.ru': 'yandex',
+    'yandex': 'yandex',
+    'google.com': 'google',
+    'google': 'google',
+    'bing.com': 'bing',
+    'yahoo.com': 'yahoo',
+    'rambler.ru': 'rambler',
+    'duckduckgo.com': 'duckduckgo',
+    'about.com': 'about.com',
+    'aol.com': 'aol.com',
+    'ask.com': 'ask.com'
+};
 
 function getUrlObject(url) {  
     if (!url) {
         return;
     }
 
-    const { hostname, protocol, hash, search } = new URL(url);  
+    const { hostname, protocol, hash, search } = new URL(url);
     const domain = hostname.replace(/^www\./, '');
 
     const domainParts = domain.split('.');
     const mainDomain = domainParts.slice(-2).join('.');
     const subdomain = domainParts.length > 2 ? domainParts.slice(0, -2).join('.') : '';
 
-    const params = new URLSearchParams(window.location.search);
-    const utmSource = params.get('utm_source');
-    const utmMedium = params.get('utm_medium');
-    const utmCampaign = params.get('utm_campaign');
-    const utmId = params.get('utm_id') || '';
-    const utmTerm = params.get('utm_term'); // не забудь ключи раскодировать decodeURIComponent
-    const utmContent = params.get('utm_content');
+    const params = new URLSearchParams(search);
+    const utmSource = params.get('utm_source') ? decodeURIComponent(params.get('utm_source')) : '';
+    const utmMedium = params.get('utm_medium') ? decodeURIComponent(params.get('utm_medium')) : '';
+    const utmCampaign = params.get('utm_campaign') ? decodeURIComponent(params.get('utm_campaign')) : '(none)';
+    const utmId = params.get('utm_id') ? decodeURIComponent(params.get('utm_id')) : '(none)';
+    const utmTerm = params.get('utm_term') ? decodeURIComponent(params.get('utm_term')) : '(none)';
+    const utmContent = params.get('utm_content') ? decodeURIComponent(params.get('utm_content')) : '(none)';
 
     return {
         url,
@@ -41,51 +59,87 @@ function isNotEmpty(value) {
 }
 
 function isInternalTransition(merge) {
-    if (!document.referrer) { // проверяем есть ли referrer, если нет возвращаем false
+    if (!stData.referrerData) {
         return false;
     }
 
-    const currentUrlObject = getUrlObject(document.URL);
-    const referrerUrlObject = getUrlObject(document.referrer);
-
-    if (merge) { // если домены и поддомены отслеживаем вместе
-        return currentUrlObject.mainDomain === referrerUrlObject.mainDomain; // сравниваем домен реферера и домен текущей страницы
-    } // если домены и поддомены отслеживаем отдельно
-    return currentUrlObject.domain === referrerUrlObject.domain; // сравниваем hostname реферера и hostname текущей страницы
+    if (merge) {
+        return stData.currentUrlData.mainDomain === stData.referrerData.mainDomain;
+    }
+    return stData.currentUrlData.domain === stData.referrerData.domain;
 }
 
 function hasUTMParameters() {
-    const currentUrlObject = getUrlObject(document.URL);
-
-    const hasUtmSource = isNotEmpty(currentUrlObject.utmSource); // проверяем есть ли что то в переменных UTM
-    const hasUtmMedium = isNotEmpty(currentUrlObject.utmMedium);
-    const hasUtmCampaign = isNotEmpty(currentUrlObject.utmCampaign);
-
-    return hasUtmSource || hasUtmMedium || hasUtmCampaign;
+    return isNotEmpty(stData.currentUrlData.utmSource) || isNotEmpty(stData.currentUrlData.utmMedium);
 }
 
-function selectOrganicSource (mainDomain) {
-    let organicSource = '';
-    switch (mainDomain) {
-        case 'ya.ru': organicSource = 'yandex'; break;
-        case 'yandex.ru': organicSource = 'yandex'; break;
-        case 'google.com': organicSource = 'google'; break;
-        case 'bing.com': organicSource = 'bing'; break;
-        case 'go.mail.ru': organicSource = 'mail.ru'; break;
-        case 'yahoo.com': organicSource = 'yahoo'; break;
-        case 'rambler.ru': organicSource = 'rambler'; break;
-        case 'duckduckgo.com': organicSource = 'duckduckgo'; break;
-        case 'about.com': organicSource = 'about.com'; break;
-        case 'aol.com': organicSource = 'aol.com'; break;
-        case 'ask.com': organicSource = 'ask.com'; break;
-        case 'globososo.com': organicSource = 'globososo'; break;
-        case 'tut.by': organicSource = 'tut.by'; break;
-        default:  organicSource = 'notFound'; break;
+function selectOrganicSource(domain) {
+    if (!domain) {
+        return false;
     }
-    return organicSource;
+    if (stOrganicSources[domain]) {
+        return stOrganicSources[domain];
+    }
+    const modifiedDomain = domain.replace(/\..*/, '');
+    if (stOrganicSources[modifiedDomain]) {
+        return stOrganicSources[modifiedDomain];
+    }
+    return false;
 }
 
-console.log(getUrlObject(document.URL));
-console.log(getUrlObject(document.referrer));
-console.log('Это внутренний переход? - ' + isInternalTransition(MERGE_SUBDOMAINS_AND_DOMAIN));
-console.log('Есть UTM метки? - ' + hasUTMParameters());
+function setCookie(name, value, days) {
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+
+function getCookie(name) {
+    const value = document.cookie;
+    const parts = value.split(`; ${name}=`);
+    
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+function getLastSignificantSource () {
+
+    stData = {
+        referrerData: getUrlObject(document.referrer),
+        currentUrlData: getUrlObject(document.URL),
+    }
+
+    if (isInternalTransition(ST_MERGE_SUBDOMAINS_AND_DOMAIN)) {
+        return;
+    }
+
+    const cookieData = getCookie(stLastSignificantCookieName)
+
+    if (hasUTMParameters()) {
+        return stData.currentUrlData.utmSource + '||'
+        + stData.currentUrlData.utmMedium + '||'
+        + stData.currentUrlData.utmCampaign + '||'
+        + stData.currentUrlData.utmId + '||'
+        + stData.currentUrlData.utmContent + '||'
+        + stData.currentUrlData.utmTerm
+    }
+
+    const organicSource = selectOrganicSource(stData.referrerData?.domain);
+    if (organicSource) {
+        return organicSource + '||organic||(none)||(none)||(none)||(none)';
+    }
+
+    if (stData.referrerData) {
+        return stData.referrerData.domain
+        + '||referral||(none)||(none)||(none)||(none)';
+    }
+
+    if (cookieData) {
+        return cookieData;
+    }
+    return '(direct)||(none)||(none)||(none)||(none)||(none)';
+}
+
+console.log(getLastSignificantSource());
